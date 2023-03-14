@@ -1,0 +1,33 @@
+{
+  "name": "deepchecks-gh-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A GitHub app to enable ML CI/CD using Deepchecks",
+  "author": "Itay Gabbay",
+  "license": "ISC",
+  "homepage": "https://github.com//",
+  "keywords": [
+    "probot",
+    "github",
+    "probot-app"
+  ],
+  "scripts": {
+    "start": "probot run ./index.js",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@probot/adapter-aws-lambda-serverless": "^3.0.2",
+    "probot": "^12.2.4"
+  },
+  "devDependencies": {
+    "jest": "^29.0.0",
+    "nock": "^13.0.5",
+    "smee-client": "^1.2.2"
+  },
+  "engines": {
+    "node": ">= 10.13.0"
+  },
+  "jest": {
+    "testEnvironment": "node"
+  }
+}
