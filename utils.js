@@ -1,6 +1,5 @@
 const YAML = require('yaml')
-var downloadFileSync = require('download-file-sync');
-
+const axios = require('axios');
 
 function getWatchedBranches(yamlStr) {
     try {
@@ -13,8 +12,8 @@ function getWatchedBranches(yamlStr) {
     }
 }
 
-function downloadFile(url) {
-    return downloadFileSync(url);
+async function downloadFile(url) {
+    return await axios.get(url);
 }
 
 module.exports = { getWatchedBranches, downloadFile };

@@ -50,8 +50,8 @@ module.exports = (app) => {
         context.repo({path: '.deepchecks', ref: context.payload.check_suite.head_branch})
       );
 
-      const yamlFile = utils.downloadFile(content.data[0].download_url);
-      const branches = utils.getWatchedBranches(yamlFile);
+      const yamlFile = await utils.downloadFile(content.data[0].download_url);
+      const branches = utils.getWatchedBranches(yamlFile.data);
 
       console.log(branches);
 
@@ -83,7 +83,7 @@ module.exports = (app) => {
             head_branch: headBranch,
             head_sha: headSha,
             status: "queued",
-            details_url: `${process.env.APP_URL}?repo_name=${context.repo().repo}?commit_sha=${headSha}`
+            details_url: `${process.env.APP_URL}?repo_name=${context.repo().repo}&commit_sha=${headSha}`
           })
         );
         
