@@ -25,7 +25,7 @@ module.exports = (app) => {
       await context.octokit.issues.createComment(
         context.repo({
           issue_number: context.payload.pull_request.number,
-          body: '🚀 `.deepchecks` configurations found. I will process the run the required checks accordingly. 🥳'
+          body: '🚀 `.deepchecks` configurations found. I will process and run the required checks accordingly. 🥳'
         })
       )
     }
