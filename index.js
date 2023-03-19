@@ -18,16 +18,48 @@ module.exports = (app) => {
     console.log(context.payload);
 
     try {
-      await context.octokit.repos.getContent(
+      const content = await context.octokit.repos.getContent(
         context.repo({path: '.deepchecks', ref: context.payload.pull_request.head.ref})
       );
+  
+      const yamlFile = await utils.downloadFile(content.data[0].download_url);
+      const branches = utils.getWatchedBranches(yamlFile.data);
+  
+      console.log(branches);
+      const tracked_pr_branches = branches['pull_request']
+  
+      const branchMatch = tracked_pr_branches.includes(context.payload.pull_request.base.ref);
+  
+      if (branchMatch) {
+        await context.octokit.issues.createComment(
+          context.repo({
+            issue_number: context.payload.pull_request.number,
+            body: '🚀 `.deepchecks` configurations found. I will process and run the required checks accordingly. 🥳'
+          })
+        )
+        const headBranch = context.payload.pull_request.head.ref;
+        const headSha = context.payload.pull_request.head.sha;
 
-      await context.octokit.issues.createComment(
-        context.repo({
-          issue_number: context.payload.pull_request.number,
-          body: '🚀 `.deepchecks` configurations found. I will process and run the required checks accordingly. 🥳'
-        })
-      )
+        const resp = await context.octokit.checks.create(
+          context.repo({
+            name: "Deepchecks Tests",
+            head_branch: headBranch,
+            head_sha: headSha,
+            status: "queued",
+            details_url: `${process.env.APP_URL}?repo_name=${context.repo().repo}&commit_sha=${headSha}&head_branch=${headBranch}`
+          })
+        );
+  
+        await axios.post(`${process.env.SERVER_URL}/v1/input/trigger`, 
+          { 
+            runConfiguration: YAML.parse(yamlFile.data),
+            checkId: resp.data.id,
+            checkSuite: resp.data.check_suite.id,
+            installation: context.payload.installation,
+            repo: context.repo()
+          }
+        );  
+      }
     }
     catch (error) {
 
@@ -42,66 +74,59 @@ module.exports = (app) => {
 
   };
 
+
+
   async function check(context) {
-    app.log.info({ event: context.name, payload: context.payload });
+    const content = await context.octokit.repos.getContent(
+      context.repo({path: '.deepchecks', ref: context.payload.check_suite.head_branch})
+    );
 
-    try {
-      const content = await context.octokit.repos.getContent(
-        context.repo({path: '.deepchecks', ref: context.payload.check_suite.head_branch})
-      );
+    const yamlFile = await utils.downloadFile(content.data[0].download_url);
+    const branches = utils.getWatchedBranches(yamlFile.data);
 
-      const yamlFile = await utils.downloadFile(content.data[0].download_url);
-      const branches = utils.getWatchedBranches(yamlFile.data);
+    console.log(branches);
 
-      console.log(branches);
-
-      let branchMatch = false;
-      // First checking if it's a push to a tracked branch
-      const tracked_direct_branches = branches['push'];
-      
-      branchMatch = tracked_direct_branches.includes(context.payload.check_suite.head_branch);
-
-      const tracked_pr_branches = branches['pull_request']
-      for (pr of context.payload.check_suite.pull_requests){
-        if (tracked_pr_branches.includes(pr.base.ref)) {
-          branchMatch = true;
-          break;
-        }
-      }
-
-      console.log(branchMatch);
-      if (branchMatch) {
-
-        // Do stuff
-        const { head_branch: headBranch, head_sha: headSha } = context.payload.check_suite;
-        // Probot API note: context.repo() => {username: 'hiimbex', repo: 'testing-things'}
+    let branchMatch = false;
+    // First checking if it's a push to a tracked branch
+    const tracked_direct_branches = branches['push'];
     
-        
-        const resp = await context.octokit.checks.create(
-          context.repo({
-            name: "Deepchecks Tests",
-            head_branch: headBranch,
-            head_sha: headSha,
-            status: "queued",
-            details_url: `${process.env.APP_URL}?repo_name=${context.repo().repo}&commit_sha=${headSha}`
-          })
-        );
-        
-        console.log(resp);
-        
-        axios.post(`${process.env.SERVER_URL}/v1/input/trigger`, 
-          { 
-            runConfiguration: YAML.parse(yamlFile),
-            checkId: resp.data.id,
-            checkSuite: resp.data.check_suite.id,
-            installation: context.payload.installation,
-            repo: context.repo()
-          }
-        );
+    branchMatch = tracked_direct_branches.includes(context.payload.check_suite.head_branch);
+
+    const tracked_pr_branches = branches['pull_request']
+    for (pr of context.payload.check_suite.pull_requests){
+      if (tracked_pr_branches.includes(pr.base.ref)) {
+        branchMatch = true;
+        break;
       }
     }
-    catch(err) {
-      app.log.info(err);
+
+    console.log(branchMatch);
+    if (branchMatch) {
+
+      // Do stuff
+      const { head_branch: headBranch, head_sha: headSha } = context.payload.check_suite;
+      // Probot API note: context.repo() => {username: 'hiimbex', repo: 'testing-things'}
+  
+
+      const resp = await context.octokit.checks.create(
+        context.repo({
+          name: "Deepchecks Tests",
+          head_branch: headBranch,
+          head_sha: headSha,
+          status: "queued",
+          details_url: `${process.env.APP_URL}?repo_name=${context.repo().repo}&commit_sha=${headSha}&head_branch=${headBranch}`
+        })
+      );
+
+      await axios.post(`${process.env.SERVER_URL}/v1/input/trigger`, 
+        { 
+          runConfiguration: YAML.parse(yamlFile.data),
+          checkId: resp.data.id,
+          checkSuite: resp.data.check_suite.id,
+          installation: context.payload.installation,
+          repo: context.repo()
+        }
+      );  
     }
   }
 
